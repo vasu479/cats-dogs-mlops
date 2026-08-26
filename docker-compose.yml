@@ -1,0 +1,44 @@
+# ---------------------------------------------------------------------------
+# M4 - Deployment target: Docker Compose.
+#
+# Local build/run:   docker compose up -d --build
+# Deploy the CI image: set IMAGE_TAG and run `docker compose pull && docker compose up -d`
+#
+# IMAGE defaults to the GHCR image published by the CI pipeline so that the CD
+# job and a laptop deploy use exactly the same manifest.
+# ---------------------------------------------------------------------------
+
+services:
+  cats-dogs-api:
+    image: ${IMAGE:-ghcr.io/vasu479/cats-dogs-api:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cats-dogs-api
+    ports:
+      - "${HOST_PORT:-8000}:8000"
+    environment:
+      MODEL_PATH: /app/models/model.pt
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      APP_VERSION: ${APP_VERSION:-1.0.0}
+      GIT_SHA: ${GIT_SHA:-local}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4).status==200 else 1)"
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+    labels:
+      project: cats-dogs-mlops
+    networks:
+      - cats-dogs-net
+
+networks:
+  cats-dogs-net:
+    name: cats-dogs-net
+    driver: bridge

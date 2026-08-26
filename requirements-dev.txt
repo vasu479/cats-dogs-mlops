@@ -1,0 +1,29 @@
+# ---------------------------------------------------------------------------
+# Training, experiment-tracking, data-versioning and test dependencies.
+# Used on the developer machine and by the CI job. NOT installed in the
+# runtime image (see requirements.txt).
+# ---------------------------------------------------------------------------
+
+-r requirements.txt
+
+# --- M1: experiment tracking and evaluation artifacts ----------------------
+mlflow==2.20.3
+scikit-learn==1.6.1
+matplotlib==3.10.0
+pandas==2.2.3
+
+# --- M1: data versioning ---------------------------------------------------
+dvc==3.59.1
+# dvc declares `pathspec>=0.10.3`, but pathspec 1.1.x removed the internal
+# `_DIR_MARK` symbol that dvc/scmrepo still import. Installing dvc without this
+# ceiling therefore resolves to pathspec 1.1.x and every dvc command dies with
+# "cannot import name '_DIR_MARK'". Verified failing, and fixed by this pin.
+pathspec==0.12.1
+
+# --- M3: testing -----------------------------------------------------------
+pytest==8.3.4
+pytest-cov==6.0.0
+httpx==0.28.1
+
+# --- M4/M5: smoke tests and the monitoring batch client --------------------
+requests==2.32.3

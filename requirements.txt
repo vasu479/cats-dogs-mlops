@@ -1,0 +1,26 @@
+# ---------------------------------------------------------------------------
+# M2 - Runtime dependencies for the inference container.
+# Every key ML library is version-pinned for reproducibility. Deliberately does
+# NOT include mlflow / scikit-learn / matplotlib: those are training-time only
+# and keeping them out roughly halves the image size.
+#
+# NOTE on torch: on Windows, plain PyPI already serves CPU-only wheels. Inside
+# the Linux container the Dockerfile adds
+#   --extra-index-url https://download.pytorch.org/whl/cpu
+# so the same pin resolves to the CPU build instead of the ~2.5 GB CUDA build.
+# ---------------------------------------------------------------------------
+
+# --- Serving ---------------------------------------------------------------
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+pydantic==2.10.4
+
+# --- Model runtime ---------------------------------------------------------
+torch==2.8.0
+torchvision==0.23.0
+numpy==2.1.3
+pillow==11.0.0
+
+# --- Configuration ---------------------------------------------------------
+PyYAML==6.0.2

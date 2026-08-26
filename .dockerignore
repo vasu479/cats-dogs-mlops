@@ -1,0 +1,33 @@
+# Keep the build context small and deterministic.
+.git
+.github
+.dvc
+.pytest_cache
+.venv
+venv
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+
+# Datasets are DVC-tracked and must never enter the image.
+data/
+mlruns/
+mlartifacts/
+
+# Dev-only material
+tests/
+scripts/
+notebooks/
+reports/
+docs/
+submission/
+*.md
+!README.md
+requirements-dev.txt
+docker-compose.yml
+.env
+.env.*
+logs/
+*.log
+*.zip

@@ -1,0 +1,55 @@
+# ---------------------------------------------------------------------------
+# M1 - DVC pipeline.
+#
+#   dvc repro          run any stage whose deps/params changed
+#   dvc dag            show the stage graph
+#   dvc metrics show   print the tracked metrics
+#   dvc plots show     render confusion matrix + loss curves
+#
+# Note on `cache: false`: outputs marked this way have their hashes recorded in
+# dvc.lock but are left for Git to store. models/model.pt (~1 MB) and the report
+# images are small and are needed by `docker build` on a clean CI runner, so they
+# live in Git; only the datasets go into DVC's cache/remote.
+# ---------------------------------------------------------------------------
+
+stages:
+  prepare:
+    cmd: python -m src.data_prep
+    deps:
+      - src/data_prep.py
+      - src/config.py
+      - data/raw
+    params:
+      - data.image_size
+      - data.train_split
+      - data.val_split
+      - data.test_split
+      - data.seed
+      - data.max_per_class
+    outs:
+      - data/processed
+
+  train:
+    cmd: python -m src.train
+    deps:
+      - src/train.py
+      - src/model.py
+      - src/datasets.py
+      - src/config.py
+      - data/processed
+    params:
+      - train
+      - model
+      - mlflow.experiment_name
+    outs:
+      - models/model.pt:
+          cache: false
+      - reports/confusion_matrix.png:
+          cache: false
+      - reports/loss_curves.png:
+          cache: false
+      - reports/classification_report.txt:
+          cache: false
+    metrics:
+      - reports/metrics.json:
+          cache: false

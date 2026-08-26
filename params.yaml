@@ -1,0 +1,41 @@
+# ---------------------------------------------------------------------------
+# Central hyper-parameter / path configuration.
+# Consumed by src/config.py and referenced by dvc.yaml so that a change here
+# invalidates the correct DVC pipeline stages.
+# ---------------------------------------------------------------------------
+
+data:
+  raw_dir: data/raw                 # expects data/raw/cat/*.jpg and data/raw/dog/*.jpg
+  processed_dir: data/processed     # 224x224 RGB, split into train/val/test
+  image_size: 224
+  train_split: 0.8
+  val_split: 0.1
+  test_split: 0.1
+  seed: 42
+  # 0 = use every image found. A non-zero value caps images per class so the
+  # full pipeline finishes in minutes on a laptop CPU (demo-friendly).
+  max_per_class: 2000
+
+train:
+  epochs: 5
+  batch_size: 32
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  num_workers: 0                    # 0 is required on Windows to avoid spawn issues
+  seed: 42
+
+model:
+  name: simple_cnn
+  num_classes: 2
+  dropout: 0.3
+
+mlflow:
+  experiment_name: cats-vs-dogs
+  tracking_uri: file:./mlruns
+  run_name: baseline-cnn
+
+serving:
+  model_path: models/model.pt
+  class_names:
+    - cat
+    - dog

@@ -1,0 +1,157 @@
+# ---------------------------------------------------------------------------
+# M3 - Continuous Integration.
+# On every push and pull request: check out, install dependencies, run the unit
+# tests, build the Docker image and (on main) publish it to GitHub Container
+# Registry.
+# ---------------------------------------------------------------------------
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BASENAME: cats-dogs-api
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  # -------------------------------------------------------------------------
+  test:
+    name: Unit tests (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --extra-index-url https://download.pytorch.org/whl/cpu \
+                      -r requirements-dev.txt
+
+      - name: Run unit tests
+        run: pytest --cov=src --cov=app --cov-report=term-missing --cov-report=xml
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+          if-no-files-found: ignore
+
+  # -------------------------------------------------------------------------
+  build-and-push:
+    name: Build image and push to GHCR
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.image_ref }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image reference (registry paths must be lowercase)
+        id: meta
+        run: |
+          OWNER="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          IMAGE="${{ env.REGISTRY }}/${OWNER}/${{ env.IMAGE_BASENAME }}"
+          echo "image=${IMAGE}"                     >> "$GITHUB_OUTPUT"
+          echo "image_ref=${IMAGE}:sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "sha_tag=sha-${GITHUB_SHA::7}"       >> "$GITHUB_OUTPUT"
+
+      - name: Verify the trained model artifact is present
+        run: |
+          test -f models/model.pt || {
+            echo "::error::models/model.pt is missing. Train the model and commit it before pushing."
+            exit 1
+          }
+          ls -lh models/model.pt
+
+      - name: Build image (and push on non-PR events)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          load: ${{ github.event_name == 'pull_request' }}
+          tags: |
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.sha_tag }}
+            ${{ steps.meta.outputs.image }}:latest
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ github.event.repository.updated_at }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Container start-up check
+        run: |
+          IMAGE_REF="${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.sha_tag }}"
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            docker pull "$IMAGE_REF"
+          fi
+          docker run -d --name ci-check -p 8000:8000 \
+            -e GIT_SHA=${{ github.sha }} "$IMAGE_REF"
+
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/health > /tmp/health.json 2>/dev/null; then
+              echo "Service is up after ${i}s"; cat /tmp/health.json; break
+            fi
+            sleep 1
+          done
+
+          curl -fsS http://localhost:8000/health | tee /tmp/health.json
+          grep -q '"model_loaded": *true' /tmp/health.json || {
+            echo "::error::Image started but the model did not load."
+            docker logs ci-check; exit 1
+          }
+
+      - name: Dump container logs on failure
+        if: failure()
+        run: docker logs ci-check || true
+
+      - name: Tear down
+        if: always()
+        run: docker rm -f ci-check || true
+
+      - name: Job summary
+        if: github.event_name != 'pull_request'
+        run: |
+          {
+            echo "### Image published"
+            echo ""
+            echo '```'
+            echo "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.sha_tag }}"
+            echo "${{ steps.meta.outputs.image }}:latest"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

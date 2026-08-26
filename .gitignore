@@ -1,0 +1,37 @@
+# ---- Python ---------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ---- Data: versioned by DVC, never by Git --------------------------------
+/data/raw
+/data/processed
+/data/kaggle_download
+
+# ---- Experiment tracking --------------------------------------------------
+/mlruns/
+/mlartifacts/
+*.db
+
+# ---- Local runtime output -------------------------------------------------
+/logs/
+*.log
+/submission/
+*.zip
+
+# NOTE: models/model.pt is intentionally NOT ignored. The baseline checkpoint is
+# ~1 MB, and committing it keeps `docker build` reproducible on a clean CI
+# runner without needing a DVC remote. See README "Why the model is in Git".
+
+# ---- OS / editor ----------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp

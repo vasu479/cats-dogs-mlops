@@ -1,0 +1,153 @@
+# ---------------------------------------------------------------------------
+# M4 - Continuous Deployment.
+#
+# Triggered automatically when the CI workflow succeeds on `main`. Pulls the
+# freshly published image from GHCR, deploys it with the same docker-compose.yml
+# used locally, then runs the post-deploy smoke test. The job FAILS - and the
+# deployment is rolled back - if the smoke test fails.
+# ---------------------------------------------------------------------------
+
+name: CD
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to deploy"
+        required: false
+        default: "latest"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BASENAME: cats-dogs-api
+  HOST_PORT: "8000"
+
+jobs:
+  deploy:
+    name: Deploy to Docker Compose target and smoke test
+    # Never deploy a red build.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install smoke-test client
+        run: pip install --quiet requests==2.32.3 pillow==11.0.0
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve image reference
+        id: image
+        run: |
+          OWNER="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          TAG="${{ github.event.inputs.image_tag }}"
+          if [ -z "$TAG" ]; then
+            SHA="${{ github.event.workflow_run.head_sha }}"
+            TAG="sha-${SHA:0:7}"
+          fi
+          IMAGE="${{ env.REGISTRY }}/${OWNER}/${{ env.IMAGE_BASENAME }}:${TAG}"
+          echo "ref=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "Deploying ${IMAGE}"
+
+      - name: Pull the new image from the registry
+        env:
+          IMAGE: ${{ steps.image.outputs.ref }}
+        run: docker compose pull
+
+      - name: Deploy / update the running service
+        env:
+          IMAGE: ${{ steps.image.outputs.ref }}
+          GIT_SHA: ${{ github.sha }}
+        run: |
+          docker compose up -d --no-build
+          docker compose ps
+
+      - name: Wait for the container to report healthy
+        run: |
+          for i in $(seq 1 60); do
+            STATUS="$(docker inspect --format '{{.State.Health.Status}}' cats-dogs-api 2>/dev/null || echo starting)"
+            echo "attempt ${i}: ${STATUS}"
+            [ "$STATUS" = "healthy" ] && exit 0
+            sleep 2
+          done
+          echo "::error::Container never became healthy."
+          docker compose logs
+          exit 1
+
+      # -- The gate: a failing smoke test fails the pipeline -----------------
+      - name: Post-deploy smoke test
+        run: |
+          python scripts/smoke_test.py \
+            --base-url "http://localhost:${{ env.HOST_PORT }}" \
+            --timeout 60
+
+      - name: Post-deploy model performance check (M5)
+        run: |
+          python scripts/monitor_batch.py \
+            --base-url "http://localhost:${{ env.HOST_PORT }}" \
+            --samples 100 \
+            --output reports/post_deploy_monitoring.json
+          cat reports/post_deploy_monitoring.json
+
+      - name: Capture service logs and metrics
+        if: always()
+        run: |
+          mkdir -p deploy-evidence
+          docker compose logs --no-color > deploy-evidence/service.log 2>&1 || true
+          curl -fsS "http://localhost:${{ env.HOST_PORT }}/metrics" \
+            > deploy-evidence/metrics.txt 2>/dev/null || true
+          cp reports/post_deploy_monitoring.json deploy-evidence/ 2>/dev/null || true
+
+      - name: Upload deployment evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-evidence
+          path: deploy-evidence/
+          if-no-files-found: ignore
+
+      - name: Roll back on smoke-test failure
+        if: failure()
+        run: |
+          echo "::error::Smoke test failed - tearing the new deployment down."
+          docker compose logs --no-color | tail -100 || true
+          docker compose down --remove-orphans || true
+
+      - name: Tear down the ephemeral environment
+        if: always()
+        run: docker compose down --remove-orphans || true
+
+      - name: Deployment summary
+        if: success()
+        run: |
+          {
+            echo "### Deployment succeeded"
+            echo ""
+            echo "| Item | Value |"
+            echo "| --- | --- |"
+            echo "| Image | \`${{ steps.image.outputs.ref }}\` |"
+            echo "| Target | Docker Compose |"
+            echo "| Smoke test | passed |"
+          } >> "$GITHUB_STEP_SUMMARY"
