@@ -60,7 +60,7 @@ if ($Full) {
     }
 
     if ($PSCmdlet.ShouldProcess("all Docker resources", "prune")) {
-        docker compose down --volumes --remove-orphans 2>$null
+        docker compose down --volumes --remove-orphans 2>&1 | Out-Null
         docker system prune -a --volumes -f
         docker builder prune -a -f
     }
@@ -78,7 +78,7 @@ Write-Section "Scoped cleanup: pattern '$ProjectPattern'"
 if (Test-Path "docker-compose.yml") {
     Write-Host "`n[1/6] docker compose down --volumes --remove-orphans"
     if ($PSCmdlet.ShouldProcess("compose stack", "down")) {
-        docker compose down --volumes --remove-orphans 2>$null
+        docker compose down --volumes --remove-orphans 2>&1 | Out-Null
     }
 } else {
     Write-Host "`n[1/6] No docker-compose.yml in the current folder - skipping."
@@ -121,7 +121,7 @@ if ($networks) {
         $id, $name = $entry -split ' ', 2
         Write-Host "      - $name"
         if ($PSCmdlet.ShouldProcess($name, "docker network rm")) {
-            docker network rm $id 2>$null | Out-Null
+            docker network rm $id 2>&1 | Out-Null
         }
     }
 } else {
@@ -135,7 +135,7 @@ if ($volumes) {
     foreach ($name in $volumes) {
         Write-Host "      - $name"
         if ($PSCmdlet.ShouldProcess($name, "docker volume rm")) {
-            docker volume rm $name 2>$null | Out-Null
+            docker volume rm $name 2>&1 | Out-Null
         }
     }
 } else {

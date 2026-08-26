@@ -95,7 +95,8 @@ if ($staged) {
 
 # --- 5. Remote -------------------------------------------------------------
 Banner 5 "Remote"
-$existing = git remote get-url origin 2>$null
+$existingRemotes = @(git remote)
+$existing = if ($existingRemotes -contains "origin") { git remote get-url origin } else { $null }
 if ($RepoUrl) {
     if ($existing) { git remote set-url origin $RepoUrl } else { git remote add origin $RepoUrl }
     Write-Host "     origin -> $RepoUrl"

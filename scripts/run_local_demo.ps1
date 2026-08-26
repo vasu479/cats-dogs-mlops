@@ -70,7 +70,7 @@ docker compose ps
 Banner 4 "Wait for the container health check to pass"
 $healthy = $false
 for ($i = 1; $i -le 45; $i++) {
-    $status = docker inspect --format '{{.State.Health.Status}}' cats-dogs-api 2>$null
+    $status = docker inspect --format '{{.State.Health.Status}}' cats-dogs-api 2>&1 | Select-Object -First 1
     Write-Host "  attempt $i : $status"
     if ($status -eq "healthy") { $healthy = $true; break }
     Start-Sleep -Seconds 2
