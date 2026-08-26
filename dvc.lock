@@ -1,0 +1,91 @@
+schema: '2.0'
+stages:
+  prepare:
+    cmd: python -m src.data_prep
+    deps:
+    - path: data/raw
+      hash: md5
+      md5: 39c1f92336b7617b629a23053625873c.dir
+      size: 848866410
+      nfiles: 25000
+    - path: src/config.py
+      hash: md5
+      md5: adcee6d9cd2bad6d3fade1bfe286a308
+      size: 3132
+    - path: src/data_prep.py
+      hash: md5
+      md5: 2c9b298e1a4f0a6f48bc9fcbde7d4f19
+      size: 6918
+    params:
+      params.yaml:
+        data.image_size: 224
+        data.max_per_class: 2000
+        data.seed: 42
+        data.test_split: 0.1
+        data.train_split: 0.8
+        data.val_split: 0.1
+    outs:
+    - path: data/processed
+      hash: md5
+      md5: 538e8caad4bdef524844628fcafac20b.dir
+      size: 59712146
+      nfiles: 4001
+  train:
+    cmd: python -m src.train
+    deps:
+    - path: data/processed
+      hash: md5
+      md5: 538e8caad4bdef524844628fcafac20b.dir
+      size: 59712146
+      nfiles: 4001
+    - path: src/config.py
+      hash: md5
+      md5: adcee6d9cd2bad6d3fade1bfe286a308
+      size: 3132
+    - path: src/datasets.py
+      hash: md5
+      md5: 5868707ba8f19419f5e6965c2f30b7dd
+      size: 2583
+    - path: src/model.py
+      hash: md5
+      md5: d83bca4386b74968f67e02c306b5830d
+      size: 2233
+    - path: src/train.py
+      hash: md5
+      md5: 9f91f3141e22c05841917d989099b050
+      size: 10693
+    params:
+      params.yaml:
+        mlflow.experiment_name: cats-vs-dogs
+        model:
+          name: simple_cnn
+          num_classes: 2
+          dropout: 0.3
+        train:
+          epochs: 15
+          batch_size: 32
+          learning_rate: 0.001
+          weight_decay: 0.0001
+          num_workers: 0
+          seed: 42
+    outs:
+    - path: models/model.pt
+      hash: md5
+      md5: e035404b6f268159abf33ddb6c410b87
+      size: 976789
+    - path: reports/classification_report.txt
+      hash: md5
+      md5: 31efce67dc58361b87b2bee7634382dd
+      size: 334
+    - path: reports/confusion_matrix.png
+      hash: md5
+      md5: 85257341778c5ba8fb678069f5ba332c
+      size: 21184
+    - path: reports/loss_curves.png
+      hash: md5
+      md5: 0d00caf14954f2c0ece0480255b3a5fc
+      size: 105255
+    - path: reports/metrics.json
+      hash: md5
+      md5: 9b4423103b0929d46f11e6c8b5158eae
+      size: 1740

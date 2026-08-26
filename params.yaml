@@ -17,7 +17,7 @@ data:
   max_per_class: 2000
 
 train:
-  epochs: 5
+  epochs: 15
   batch_size: 32
   learning_rate: 0.001
   weight_decay: 0.0001
