@@ -9,18 +9,7 @@ CI → CD → monitoring.
 
 ---
 
-## ⚠️ Read this first — bootstrap artifacts
 
-This repository ships with a **synthetic placeholder** `models/model.pt`,
-`data/monitoring_samples/` and `reports/*`. They exist so that your very first
-`git push` produces a **green CI and CD run before you have downloaded a single byte
-from Kaggle** — which means if something breaks later, you know it was your change
-and not the plumbing.
-
-They are **not** your submission. Step 3 of the quickstart replaces all of them with
-artifacts trained on the real Kaggle dataset.
-
----
 
 ## Architecture
 
@@ -101,21 +90,16 @@ cats-dogs-mlops/
 
 ---
 
-## Quickstart (Windows / PowerShell)
-
-Run everything from the repository root in **PowerShell**, not cmd.
-
 ### 0. Clean Docker first
 
 ```powershell
-# Scoped: removes only cats-dogs-* containers, images, volumes, networks, cache.
-# Anything else on your machine is untouched.
+
 .\scripts\docker_cleanup.ps1
 
 # Preview without deleting anything:
 .\scripts\docker_cleanup.ps1 -WhatIf
 
-# Machine-wide wipe (asks for typed confirmation; deletes OTHER projects' images too):
+
 .\scripts\docker_cleanup.ps1 -Full
 ```
 
@@ -133,7 +117,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass   # allow local scrip
 # Real data (needs %USERPROFILE%\.kaggle\kaggle.json):
 .\scripts\download_data.ps1
 
-# No Kaggle token yet? Validate the plumbing with a synthetic stand-in:
+
 python scripts\make_synthetic_data.py --per-class 500
 ```
 
@@ -281,20 +265,6 @@ runs and the confusion matrix reflects real performance rather than augmentation
 
 ---
 
-## Screen recording — 5-minute shot list
-
-| Time | Show | Command |
-| --- | --- | --- |
-| 0:00–0:30 | Repo tree, `params.yaml`, DVC files | `dvc dag`, `git log --oneline` |
-| 0:30–1:15 | **M1** MLflow UI: params, metrics, confusion matrix, loss curves | `mlflow ui` |
-| 1:15–2:00 | **M2** Dockerfile + `docker compose up`, `/health`, `/predict` via curl | `.\scripts\run_local_demo.ps1` |
-| 2:00–2:45 | **M3** Make a small code change, push, watch CI run tests + push to GHCR | `.\scripts\push_to_github.ps1` |
-| 2:45–3:45 | **M4** CD triggers, pulls the image, deploys, smoke test passes | GitHub Actions CD run |
-| 3:45–4:30 | **M5** `/metrics`, JSON logs, `monitor_batch.py` live accuracy | `python scripts\monitor_batch.py` |
-| 4:30–5:00 | GHCR package page showing the published tags | browser |
-
-The single most persuasive shot is **2:00–3:45**: one commit flowing all the way from your
-editor to a deployed, smoke-tested container. Record that segment without cuts.
 
 ---
 
@@ -311,5 +281,5 @@ Executed and passing on Linux/CPU before delivery:
 
 Not executed before delivery: `docker build` (no Docker daemon was available in the authoring
 environment). The Dockerfile was reviewed statically and its runtime import graph verified
-against `requirements.txt`. **Run step 4 of the quickstart first** — it is the one step with
+against `requirements.txt`. 
 no prior execution behind it.
